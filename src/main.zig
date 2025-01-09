@@ -96,7 +96,7 @@ pub fn main() !void {
     csv_parser.displayAll();
 
     // Example: Retrieve and display the value at row 0, column 1
-    if (csv_parser.getValue(0, 1)) |value| {
+    if (csv_parser.getValue(0, 20)) |value| {
         std.debug.print("Value at (0, 1): {s}\n", .{value});
     } else {
         std.debug.print("Value at (0, 1) not found or out of bounds.\n", .{});
