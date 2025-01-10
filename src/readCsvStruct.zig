@@ -16,10 +16,6 @@ const CsvParser = struct {
             for (row.items) |col| {
                 self.allocator.free(col); // Free the memory for each column
             }
-            //             for (row.items) |col| {
-            //     self.allocator.free(col.ptr); // Free each column
-            // }
-            std.debug.print("Deinitializing row with {d} columns.\n", .{row.items.len});
             row.deinit(); // Deallocates each row's memory
         }
         self.matrix.deinit(); // Deallocates the outer matrix
@@ -60,41 +56,27 @@ const CsvParser = struct {
 
             // Add the completed row to the matrix
             try self.matrix.append(row_data);
-            std.debug.print("Row appended, matrix size: {d}\n", .{self.matrix.items.len});
-        }
-
-        std.debug.print("The value in read {s}\n", .{self.matrix.items[0].items[0]});
-    }
-
-    pub fn printValue(self: *CsvParser, row: usize, col: usize) void {
-        if (row < self.matrix.items.len and col < self.matrix.items[row].items.len) {
-            const value = self.matrix.items[row].items[col];
-            // Use allocator-independent debug output
-            std.log.info("Matrix element: {s}", .{value});
-        } else {
-            std.log.err("Index out of bounds: row={d}, col={d}", .{ row, col });
         }
     }
 
     pub fn displayAll(self: *CsvParser) void {
-        const value = self.matrix.items[0].items[2];
-        std.debug.print("The value at matrix is here motherfucker {s}:\n", .{value});
-        // if (self.matrix.items.len == 0) {
-        //     std.log.info("Matrix is empty.", .{});
-        //     return;
-        // }
 
-        // var row_index : usize  = 0;
-        // for (self.matrix.items) |row| {
-        //     std.debug.print("Row {d}:\n", .{row_index});
-        //     var col_index : usize  =0;
-        //     for (row.items) |value| {
-        //         std.debug.print("  Column {d}: {s}\n", .{col_index, value});
-        //         col_index += 1;
-        //     }
+        if (self.matrix.items.len == 0) {
+            std.log.info("Matrix is empty.", .{});
+            return;
+        }
 
-        //     row_index +=1;
-        // }
+        var row_index : usize  = 0;
+        for (self.matrix.items) |row| {
+            std.debug.print("Row {d}:\n", .{row_index});
+            var col_index : usize  =0;
+            for (row.items) |value| {
+                std.debug.print("  Column {d}: {s}\n", .{col_index, value});
+                col_index += 1;
+            }
+
+            row_index +=1;
+        }
     }
 
     pub fn getValue(self: *CsvParser, row: usize, col: usize) ?[]const u8 {
@@ -109,16 +91,13 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
     var csv_parser = CsvParser.init(&allocator);
     defer csv_parser.deinit();
-    try csv_parser.readCsv("Book1.csv");
+    try csv_parser.readCsv("mnist_test.csv");
+    std.debug.print("Reading completed", .{});
 
-    // Example: Print element at row 1, column 0
-    //csv_parser.printValue(1, 0);
-
-    csv_parser.displayAll();
-    //std.debug.print("displaying CSV file: {s}\n", .{"mnist_test.csv"});
+    //csv_parser.displayAll();
 
     // Example: Retrieve and display the value at row 0, column 1
-    if (csv_parser.getValue(0, 1)) |value| {
+    if (csv_parser.getValue(0, 20)) |value| {
         std.debug.print("Value at (0, 1): {s}\n", .{value});
     } else {
         std.debug.print("Value at (0, 1) not found or out of bounds.\n", .{});
