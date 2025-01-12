@@ -1,27 +1,24 @@
 const std = @import("std");
 
+const CsvParserErrors = error{
+    NoHeadersAvailable,
+    ColumnNotFound,
+};
+
 const CsvParser = struct {
     allocator: std.mem.Allocator,
     matrix: std.ArrayList(std.ArrayList([]const u8)),
+    headers: ?std.ArrayList([]const u8), // Optional field for storing headers
 
     pub fn init(allocator: *const std.mem.Allocator) CsvParser {
         return CsvParser{
             .allocator = allocator.*,
             .matrix = std.ArrayList(std.ArrayList([]const u8)).init(allocator.*),
+            .headers = null,
         };
     }
 
-    pub fn deinit(self: *CsvParser) void {
-        for (self.matrix.items) |row| {
-            for (row.items) |col| {
-                self.allocator.free(col); // Free the memory for each column
-            }
-            row.deinit(); // Deallocates each row's memory
-        }
-        self.matrix.deinit(); // Deallocates the outer matrix
-    }
-
-    pub fn readCsv(self: *CsvParser, path: []const u8) !void {
+    pub fn readCsv(self: *CsvParser, path: []const u8, has_header: bool) !void {
         const cwd = std.fs.cwd();
         const file = try cwd.openFile(path, .{});
         defer file.close();
@@ -44,108 +41,136 @@ const CsvParser = struct {
         // Split rows by newline
         var rows = std.mem.splitSequence(u8, content, "\n");
 
+        var is_first_row = true;
+
         while (rows.next()) |row| {
-            // Allocate a single buffer for the entire row
-            const row_buffer = try self.allocator.alloc(u8, row.len);
-            defer self.allocator.free(row_buffer);
-
-            std.mem.copyForwards(u8, row_buffer, row);
-
-            // Split the row into columns
             var row_data = std.ArrayList([]const u8).init(self.allocator);
-            var cols = std.mem.splitSequence(u8, row_buffer, ",");
+            var cols = std.mem.splitSequence(u8, row, ",");
+
             while (cols.next()) |col| {
-
-                // Allocate memory for each column's data
                 const copied_col = try self.allocator.alloc(u8, col.len);
-
-                // Copy the column's data into the newly allocated memory
                 std.mem.copyForwards(u8, copied_col, col);
-
-                // Append the slice of the copied array to row_data
                 try row_data.append(copied_col[0..]);
-                //try row_data.append(col); // Use slices from the preallocated buffer
             }
 
-            // Add the row to the matrix
-            try self.matrix.append(row_data);
+            if (is_first_row and has_header) {
+                self.headers = row_data;
+            } else {
+                try self.matrix.append(row_data);
+            }
+
+            is_first_row = false;
         }
     }
 
-    pub fn displayAll(self: *CsvParser) void {
-        if (self.matrix.items.len == 0) {
-            std.log.info("Matrix is empty.", .{});
-            return;
+    pub fn getColumnByName(self: *CsvParser, column_name: []const u8) !std.ArrayList([]const u8) {
+        if (self.headers == null) {
+            std.log.err("No headers available. Cannot find column '{s}'.", .{column_name});
+            return error.NoHeadersAvailable; // Define an appropriate error type
         }
 
-        var row_index: usize = 0;
+        // Find the column index
+        var column_index: i32 = -1;
+        var idx: i32 = 0;
+        for (self.headers.?.items) |header| {
+            if (std.mem.eql(u8, header, column_name)) {
+                column_index = idx;
+                break;
+            }
+            idx += 1;
+        }
+
+        if (column_index == -1) {
+            std.log.err("Column '{s}' not found in headers.", .{column_name});
+            return error.ColumnNotFound; // Define an appropriate error type
+        }
+
+        var list = std.ArrayList([]const u8).init(self.allocator);
+
+        //defer list.deinit();
+
         for (self.matrix.items) |row| {
-            std.debug.print("Row {d}:\n", .{row_index});
-            var col_index: usize = 0;
-            for (row.items) |value| {
-                std.debug.print("  Column {d}: {s}\n", .{ col_index, value });
-                col_index += 1;
+            if (column_index >= row.items.len) {
+                std.log.warn("Row is missing data for column '{s}'.", .{column_name});
+                continue;
             }
+            const column_index_usize: usize = @intCast(column_index);
+            const col_data = row.items[column_index_usize];
 
-            row_index += 1;
+            try list.append(col_data);
         }
+
+        return list;
     }
 
-    pub fn getValue(self: *CsvParser, row: usize, col: usize) ?[]const u8 {
-        if (row < self.matrix.items.len and col < self.matrix.items[row].items.len) {
-            return self.matrix.items[row].items[col];
-        }
-        return null; // Return `null` if the indices are out of bounds
-    }
-
-    pub fn displayHead(self: *CsvParser, n: usize) void {
-        const total_rows = self.matrix.items.len;
-
-        if (total_rows == 0) {
-            std.log.info("Matrix is empty. Nothing to display.", .{});
+    pub fn displayHeaders(self: *CsvParser) void {
+        if (self.headers == null) {
+            std.log.info("No headers found.", .{});
             return;
         }
 
-        const display_count = if (n < total_rows) n else total_rows;
-        std.log.info("Displaying first {d} row(s):", .{display_count});
-
-        var row_index: usize = 0;
-        for (self.matrix.items[0..display_count]) |row| {
-            std.debug.print("Row {d}:\n", .{row_index});
-            row_index += 1;
-
-            var col_index: usize = 0;
-            for (row.items) |value| {
-                std.debug.print("  Column {d}: {s}\n", .{ col_index, value });
-                col_index += 1;
-            }
+        std.log.info("Headers:", .{});
+        var col_index: usize = 0;
+        for (self.headers.?.items) |header| {
+            std.debug.print("Header {d}: {s}\n", .{ col_index, header });
+            col_index += 1;
         }
     }
 
-    pub fn displayTail(self: *CsvParser, n: usize) void {
-        const total_rows = self.matrix.items.len;
+    pub fn addRow(self: *CsvParser, new_row: []const []const u8) !void {
+        var row_data = std.ArrayList([]const u8).init(self.allocator);
+        // defer row_data.deinit();
 
-        if (total_rows == 0) {
-            std.log.info("Matrix is empty. Nothing to display.", .{});
-            return;
+        for (new_row) |col| {
+            const copied_col = try self.allocator.alloc(u8, col.len);
+            std.mem.copyForwards(u8, copied_col, col);
+            try row_data.append(copied_col[0..]);
         }
 
-        const display_count = if (n < total_rows) n else total_rows;
-        const start_index = total_rows - display_count;
+        try self.matrix.append(row_data);
+    }
 
-        std.log.info("Displaying last {d} row(s):", .{display_count});
+    pub fn writeCsv(self: *CsvParser, path: []const u8) !void {
+        const cwd = std.fs.cwd();
+        var file = try cwd.createFile(path, .{ .truncate = true });
+        defer file.close();
 
-        var row_index: usize = start_index;
-        for (self.matrix.items[start_index..total_rows]) |row| {
-            std.debug.print("Row {d}:\n", .{row_index});
-            row_index += 1;
+        if (self.headers != null) {
+            var idx: usize = 0;
+            for (self.headers.?.items) |header| {
+                if (idx != 0) try file.writeAll(",");
+                try file.writeAll(header);
 
-            var col_index: usize = 0;
-            for (row.items) |value| {
-                std.debug.print("  Column {d}: {s}\n", .{ col_index, value });
-                col_index += 1;
+                idx += 1;
             }
         }
+
+        for (self.matrix.items) |row| {
+            var idx: usize = 0;
+            for (row.items) |col| {
+                if (idx != 0) try file.writeAll(",");
+                try file.writeAll(col);
+                idx += 1;
+            }
+            try file.writeAll("\n");
+        }
+    }
+
+    pub fn deinit(self: *CsvParser) void {
+        if (self.headers) |header_row| {
+            for (header_row.items) |header| {
+                self.allocator.free(header);
+            }
+            header_row.deinit();
+        }
+
+        for (self.matrix.items) |row| {
+            for (row.items) |col| {
+                self.allocator.free(col); // Free the memory for each column
+            }
+            row.deinit(); // Deallocates each row's memory
+        }
+        self.matrix.deinit(); // Deallocates the outer matrix
     }
 };
 
@@ -153,14 +178,21 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
     var csv_parser = CsvParser.init(&allocator);
     defer csv_parser.deinit();
-    try csv_parser.readCsv("Book1.csv");
-    std.debug.print("Reading completed", .{});
+    try csv_parser.readCsv("Book1.csv", true);
+    // std.debug.print("Reading completed", .{});
 
-    csv_parser.displayTail(1);
-    // Example: Retrieve and display the value at row 0, column 1
-    if (csv_parser.getValue(0, 2)) |value| {
-        std.debug.print("Value at (0, 1): {s}\n", .{value});
-    } else {
-        std.debug.print("Value at (0, 1) not found or out of bounds.\n", .{});
-    }
+    //csv_parser.displayHeaders();
+
+    const newRow = [_][]const u8{ "Roshan", "27", "Zig is awesome!", "alice@example.com", "123-456-7890", "Software Engineer" };
+
+    try csv_parser.addRow(&newRow);
+
+    // const result = try csv_parser.getColumnByName("name");
+    // defer result.deinit(); // Ensure the memory is properly deallocated after use
+
+    // for (result.items) |item| {
+    //     std.debug.print("Value: {s}\n", .{item});
+    // }
+
+    try csv_parser.writeCsv("test_file.csv");
 }

@@ -1,0 +1,21 @@
+name,age,city,email,phone,occupationAlice,30,New York,alice@example.com,123-456-7890,Software Engineer
+Bob,25,San Francisco,bob@example.com,987-654-3210,Graphic Designer
+Charlie,35,Chicago,charlie@example.com,555-123-4567,Teacher
+Diana,28,Los Angeles,diana@example.com,444-987-6543,Marketing Manager
+Eve,22,Austin,eve@example.com,333-555-6789,Student
+Frank,40,Houston,frank@example.com,222-666-1234,Architect
+Grace,29,Seattle,grace@example.com,111-777-4321,Data Analyst
+Hank,32,Denver,hank@example.com,888-222-5678,Sales Manager
+Ivy,26,Boston,ivy@example.com,999-333-8901,Research Scientist
+Jack,38,Miami,jack@example.com,777-444-6780,Chef
+Kate,24,Portland,kate@example.com,666-555-2345,Writer
+Leo,27,Philadelphia,leo@example.com,555-888-7896,Mechanical Engineer
+Mona,33,Phoenix,mona@example.com,444-111-0987,Nurse
+Nina,31,San Diego,nina@example.com,333-222-5674,HR Specialist
+Oscar,36,Atlanta,oscar@example.com,222-333-7892,Financial Advisor
+Paul,21,Orlando,paul@example.com,123-444-6789,Intern
+Quincy,34,Las Vegas,quincy@example.com,888-555-3456,Project Manager
+Rose,23,Salt Lake City,rose@example.com,999-111-2345,Photographer
+Steve,39,San Antonio,steve@example.com,777-888-1234,Entrepreneur
+Tina,37,Detroit,tina@example.com,666-444-7890,Lawyer
+Roshan,27,Zig is awesome!,alice@example.com,123-456-7890,Software Engineer
