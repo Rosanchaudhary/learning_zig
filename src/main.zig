@@ -130,44 +130,92 @@ const CsvParser = struct {
         try self.matrix.append(row_data);
     }
 
+    pub fn addColumn(self: *CsvParser, column_name: []const u8, values: []const []const u8) !void {
+        if (self.headers == null) {
+            self.headers = std.ArrayList([]const u8).init(self.allocator);
+        }
+
+        std.debug.print("The column name {s}", .{column_name});
+
+        try self.headers.?.append(column_name);
+
+        if (values.len != self.matrix.items.len) {
+            return error.InvalidColumnLength; // Define this error
+        }
+
+        var idx: usize = 0;
+
+        for (self.matrix.items) |_| {
+            try self.matrix.items[idx].append(values[idx]);
+            idx += 1;
+        }
+    }
+
     pub fn writeCsv(self: *CsvParser, path: []const u8) !void {
         const cwd = std.fs.cwd();
         var file = try cwd.createFile(path, .{ .truncate = true });
         defer file.close();
 
-        if (self.headers != null) {
-            var idx: usize = 0;
-            for (self.headers.?.items) |header| {
-                if (idx != 0) try file.writeAll(",");
-                try file.writeAll(header);
+        // if (self.headers != null) {
+        //     var idx: usize = 0;
+        //     for (self.headers.?.items) |header| {
+        //         std.debug.print("{s} \t", .{header});
+        //         if (idx != 0) try file.writeAll(",");
+        //         try file.writeAll(header);
+        //         idx += 1;
+        //     }
+        // }
 
-                idx += 1;
+
+            var line = std.ArrayList(u8).init(self.allocator);
+            defer line.deinit();
+
+            var i: usize = 0;
+            for (self.headers.?.items) |col| {
+                if (i != 0) try line.append(',');
+                try line.appendSlice(col);
+                i += 1;
             }
-        }
+            try line.appendSlice("\n");
 
+            try file.writeAll(line.items);
+        
+
+        // for (self.matrix.items) |row| {
+        //     var idx: usize = 0;
+        //     for (row.items) |col| {
+        //         if (idx != 0) try file.writeAll(",");
+        //         try file.writeAll(col);
+        //         idx += 1;
+        //     }
+        //     try file.writeAll("\n");
+        // }
+    }
+
+    pub fn displayTable(self: *CsvParser) void {
+        // Display the initial table
+        std.debug.print("Initial Table Data:\n", .{});
         for (self.matrix.items) |row| {
-            var idx: usize = 0;
             for (row.items) |col| {
-                if (idx != 0) try file.writeAll(",");
-                try file.writeAll(col);
-                idx += 1;
+                std.debug.print("{s}", .{col});
             }
-            try file.writeAll("\n");
+            std.debug.print("\n", .{});
         }
     }
 
     pub fn deinit(self: *CsvParser) void {
         if (self.headers) |header_row| {
-            for (header_row.items) |header| {
-                self.allocator.free(header);
-            }
+            // for (header_row.items) |header| {
+
+            //     self.allocator.free(header);
+            // }
             header_row.deinit();
         }
 
         for (self.matrix.items) |row| {
-            for (row.items) |col| {
-                self.allocator.free(col); // Free the memory for each column
-            }
+            // for (row.items) |col| {
+            //     self.allocator.free(col); // Free the memory for each column
+            // }
             row.deinit(); // Deallocates each row's memory
         }
         self.matrix.deinit(); // Deallocates the outer matrix
@@ -178,21 +226,22 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
     var csv_parser = CsvParser.init(&allocator);
     defer csv_parser.deinit();
+
     try csv_parser.readCsv("Book1.csv", true);
-    // std.debug.print("Reading completed", .{});
 
-    //csv_parser.displayHeaders();
+    try csv_parser.addColumn("Hobby", &[_][]const u8{ "Games", "Video" });
+    try csv_parser.addColumn("Good", &[_][]const u8{ "Games", "Video" });
+    //csv_parser.displayTable();
+    // const newRow = [_][]const u8{ "Roshan", "27", "Zig is awesome!", "alice@example.com", "123-456-7890", "Software Engineer" };
 
-    const newRow = [_][]const u8{ "Roshan", "27", "Zig is awesome!", "alice@example.com", "123-456-7890", "Software Engineer" };
+    // try csv_parser.addRow(&newRow);
 
-    try csv_parser.addRow(&newRow);
-
-    // const result = try csv_parser.getColumnByName("name");
+    // const result = try csv_parser.getColumnByName("Hobby");
     // defer result.deinit(); // Ensure the memory is properly deallocated after use
 
     // for (result.items) |item| {
     //     std.debug.print("Value: {s}\n", .{item});
     // }
 
-    try csv_parser.writeCsv("test_file.csv");
+    try csv_parser.writeCsv("test_two_file.csv");
 }
