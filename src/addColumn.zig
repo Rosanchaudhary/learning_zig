@@ -33,12 +33,7 @@ pub fn main() !void {
 
     // Display the initial table
     std.debug.print("Initial Table Data:\n", .{});
-    for (rows.items) |row| {
-        for (row.items) |col| {
-            std.debug.print("{s:12}", .{col});
-        }
-        std.debug.print("\n", .{});
-    }
+    printTable(rows);
 
     // Add a new column: "Occupation"
     try rows.items[0].append("Occupation"); // Update the header row
@@ -46,18 +41,62 @@ pub fn main() !void {
     try rows.items[2].append("Doctor");
     try rows.items[3].append("Student");
 
-    // Display the updated table
-    std.debug.print("\nUpdated Table Data:\n", .{});
-    for (rows.items) |row| {
-        for (row.items) |col| {
-            std.debug.print("{s:12}", .{col});
-        }
-        std.debug.print("\n", .{});
-    }
+    // Display the updated table with the new column
+    std.debug.print("\nTable with New Column:\n", .{});
+    printTable(rows);
+
+    // Remove a column by name
+    try removeColumnByName(&rows, "Age");
+
+    // Display the updated table after column removal
+    std.debug.print("\nTable After Removing 'Age' Column:\n", .{});
+    printTable(rows);
 
     // Free memory used by each row and the main ArrayList
     for (rows.items) |row| {
         row.deinit();
     }
     rows.deinit();
+}
+
+// Function to print the table
+fn printTable(rows: std.ArrayList(std.ArrayList([]const u8))) void {
+    for (rows.items) |row| {
+        for (row.items) |col| {
+            std.debug.print("{s:12}", .{col});
+        }
+        std.debug.print("\n", .{});
+    }
+}
+
+// Function to remove a column by name
+fn removeColumnByName(rows: *std.ArrayList(std.ArrayList([]const u8)), colName: []const u8) !void {
+    if (rows.items.len == 0) return; // If the table is empty, do nothing
+
+    // Find the index of the column in the header row
+    const header = &rows.items[0];
+    var colIndex: ?usize = null;
+    var index: usize = 0;
+    for (header.items) |col| {
+        if (std.mem.eql(u8, col, colName)) {
+            colIndex = index;
+            break;
+        }
+        index += 1;
+    }
+
+    // If the column is not found, return an error
+    if (colIndex == null) return error.InvalidColumnName;
+
+    // Remove the column from each row by shifting elements
+
+    for (rows.items) |row| {
+        var rowItemsLen: usize = row.items.len;
+        var targetIndex = colIndex.?;
+        while (targetIndex < rowItemsLen - 1) {
+            row.items[targetIndex] = row.items[targetIndex + 1];
+            targetIndex += 1;
+        }
+        rowItemsLen -= 1; // Decrement the length to remove the last element
+    }
 }
