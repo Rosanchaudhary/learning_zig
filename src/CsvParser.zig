@@ -183,6 +183,54 @@ pub const CsvParser = struct {
         }
     }
 
+    pub fn filterRowsByThreshold(
+        self: *CsvParser,
+        column_name: []const u8,
+        threshold: i64,
+    ) !std.ArrayList([]const []const u8) {
+        if (self.headers == null) {
+            return error.NoHeadersAvailable; // Ensure headers exist
+        }
+
+        // Find the column index
+        var column_index: i32 = -1;
+        var idx: i32 = 0;
+        for (self.headers.?.items) |header| {
+            if (std.mem.eql(u8, header, column_name)) {
+                column_index = idx;
+                break;
+            }
+            idx += 1;
+        }
+
+        if (column_index == -1) {
+            return error.ColumnNotFound; // Column does not exist
+        }
+
+        const column_index_usize: usize = @intCast(column_index);
+
+        // Initialize an ArrayList to store filtered rows
+        var filtered_rows = std.ArrayList([]const []const u8).init(self.allocator);
+
+
+        // Iterate through rows and apply the filter
+        for (self.matrix.items) |row| {
+            if (column_index_usize >= row.items.len) {
+                continue; // Skip rows with missing columns
+            }
+
+            // Convert column value to integer
+            const col_data = row.items[column_index_usize];
+            const col_value = try std.fmt.parseInt(i64, col_data, 10);
+
+            if (col_value >= threshold) {
+                try filtered_rows.append(row.items);
+            }
+        }
+
+        return filtered_rows;
+    }
+
     pub fn writeCsv(self: *CsvParser, path: []const u8) !void {
         const cwd = std.fs.cwd();
         var file = try cwd.createFile(path, .{ .truncate = true });
